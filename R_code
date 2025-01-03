@@ -1,0 +1,159 @@
+install.packages("tidyverse")
+install.packages("modelr")
+install.packages("MuMIn")
+library(MuMIn)
+library(ggplot2)
+library(modelr)
+library(tidyr)
+library(plotly)
+
+SC <- read.csv("//Users/guestpc/Library/CloudStorage/OneDrive-UniversityofNewMexico/a1DOCS/Carbon Project NMSU/Carbon Project Data/SeedCarbon5_newclim.csv")
+#SC <- read.csv("C:/Users/Chris/OneDrive - University of New Mexico/a1DOCS/Carbon Project NMSU/Carbon Project Data/SeedCarbon2.csv")
+
+nrow(SC)
+glimpse(SC)
+#change column types
+
+str(SC)
+SC$Diameter <- as.integer(as.character(SC$Diameter))
+SC$Height <- as.integer(as.character(SC$Height))
+SC$SHELTER <- as.integer(as.character(SC$Height))
+SC$NEEDLE_DRYWT <- as.double(as.character(SC$NEEDLE_DRYWT))
+SC$Combined_DRYWT <- as.double(as.character(SC$Combined_DRYWT))
+
+ggplot(SC, aes(x = Height*Diameter, y = Combined_DRYWT, col = SITE, group = SITE))+
+  geom_point(size = 3, alpha = 0.3)+
+  geom_smooth(method = "gam", alpha = 0.13)+xlim(0,1000)
+
+SC1 <- dplyr::filter(SC, UngulateBrowse == 0)
+SC2 <- dplyr::filter(SC1, RodentDamage == 0)
+
+ggplot(SC2, aes(x = Height*Diameter, y = Combined_DRYWT, col = SITE, group = SITE))+
+  geom_point(size = 3, alpha = 0.3)+
+  geom_smooth(method = "gam", alpha = 0.13)+xlim(0,1000)
+
+gam1 <- mgcv::gam(Combined_DRYWT ~ 0 +Height*Diameter, data = SC2, na.action = na.exclude)
+summary(gam1)
+gam2 <- mgcv::gam(GRNWT ~ 0+ Height*Diameter, data = SC2, na.action = na.exclude)
+summary(gam2)
+gam3 <- mgcv::gam(NEEDLE_DRYWT~ 0+ Height*Diameter, data = SC2)
+summary(gam3)
+gam4 <- mgcv::gam(STEM_DRYWT ~ 0+ Height*Diameter, data = SC2, na.action = na.exclude)
+summary(gam4)
+gam1_smooth <- mgcv::gam(Combined_DRYWT ~ 0 +s(Height)*s(Diameter), data = SC2)
+summary(gam1_smooth)
+
+SC2 <- add_predictions(SC2, gam1, var = "pred_direct_gam", type = NULL)
+SC2 <- add_predictions(SC2, gam1_smooth, var = "pred_direct_gam_smooth", type = NULL)
+lmAA <- lm(pred_direct_gam ~ pred_direct_gam_smooth, data = SC2 )
+summary(lmAA)
+
+write.csv(SC2,"//Users/guestpc/Library/CloudStorage/OneDrive-UniversityofNewMexico/a1DOCS/Carbon Project NMSU/Carbon Project Data/SC2.csv")
+
+
+SC2$AGE <- (2024 - SC2$Year.Planted)
+
+gam5 <- mgcv::gam(pred_direct_gam~AGE+bio_18+bio_5+bio_1, data = SC2)
+summary(gam5)
+
+gam6 <- mgcv::gam(pred_direct_gam~0+AGE+bio_18+bio_5+bio_1, data = SC2)
+summary(gam6)
+
+SC2$pred_direct_gam
+SC2 <- SC2 %>% drop_na(pred_direct_gam)
+gam7 <- mgcv::gam(pred_direct_gam~0+AGE+bio_1+bio_2+bio_3+bio_4+bio_5+
+                    bio_6+bio_7+bio_8+bio_9+bio_10+
+                    bio_11+bio_12+bio_13+bio_14+bio_15+
+                    bio_16+bio_17+bio_18+bio_19,data = SC2)
+summary(gam7)
+
+options(na.action = "na.fail")
+dd <- dredge(gam7, extra = alist(AIC, BIC, ICOMP, Cp))
+options(na.action = "na.omit")
+Age 17 3 4 7
+
+
+
+gam7a <- mgcv::g
+
+gam8 <- mgcv::gam(pred_direct_gam~0+AGE+bio_5+bio_10+bio_14,data = SC2)
+summary(gam8)
+
+gam9 <- mgcv::gam(pred_direct_gam~0+AGE+bio_10+bio_12+bio_16+bio_17,data = SC2)
+summary(gam9)
+
+gam10 <-mgcv::gam(pred_direct_gam~AGE+bio_10+bio_12+bio_16+bio_17,data = SC2)
+summary(gam10)
+
+gam9 <- mgcv::gam(pred_direct_gam~0+AGE+bio_10+bio_12+bio_16+bio_17,data = SC2)
+summary(gam9)
+
+gam11 <- mgcv::gam(pred_direct_gam~0+s(AGE,k=5)+bio_10+bio_12+bio_16+s(bio_17,k=6),data = SC2)
+summary(gam11)
+
+
+gam12 <- mgcv::gam(pred_direct_gam~0+s(AGE,k=5)+bio_10+bio_12+bio_16+bio_17,data = SC2, method = 
+                     "REML")
+summary(gam12)
+
+
+SC2 <- add_predictions(SC2, gam9, var = "pred_indirect_gam", type = NULL)
+SC2 <- add_predictions(SC2, gam11, var = "pred_indirect_gam_smooth", type = NULL)
+
+
+nrow(SC2)
+
+direct_check_lm <- lm(Combined_DRYWT ~pred_direct_gam, data = SC2)
+summary(direct_check_lm)
+indirect_check_lm <- lm(Combined_DRYWT ~pred_indirect_gam, data = SC2)
+summary(indirect_check_lm)
+indirect_smooth_check_lm <- lm(Combined_DRYWT ~pred_indirect_gam_smooth, data = SC2)
+summary(indirect_smooth_check_lm)
+
+indirect_direct_check_lm <- lm(pred_direct_gam ~pred_indirect_gam, data = SC2)
+summary(indirect_direct_check_lm)
+indirect_direct_check_lm <- lm(pred_direct_gam ~pred_indirect_gam_smooth, data = SC2)
+summary(indirect_direct_check_lm)
+
+
+
+indirect_check_lm <- lm(Combined_DRYWT ~pred_indirect_gam, data = SC2)
+summary(indirect_check_lm)
+
+
+###---FIGURE 1
+
+SC_present <- read.csv("//Users/guestpc/Library/CloudStorage/OneDrive-UniversityofNewMexico/a1DOCS/Carbon Project NMSU/Project_C_stock_by_site_new_b.csv")
+
+SC_present <- add_predictions(SC_present, gam9, var = "pred_indirect_gam")
+
+SC_present <- add_predictions(SC_present, gam11, var = "pred_indirect_gam_smooth")
+SC_present$C_kg_per_acre1 <- ((SC_present$pred_indirect_gam * SC_present$TPA_planted)/100)
+SC_present$C_kg_per_acre2 <- ((SC_present$pred_indirect_gam_smooth * SC_present$TPA_planted)/100)
+SC_present$C_kg_per_acre_surv_adj1 <- (SC_present$C_kg_per_acre1 * SC_present$Est_Survival)
+SC_present$C_kg_per_acre_surv_adj2 <- (SC_present$C_kg_per_acre2 * SC_present$Est_Survival)
+
+SC_present2  <- SC_present %>% mutate(C_kg_per_acre1 = if_else(C_kg_per_acre1 <0, 0, C_kg_per_acre1))
+SC_present2  <- SC_present %>% mutate(C_kg_per_acre2 = if_else(C_kg_per_acre2 <0, 0, C_kg_per_acre2))
+SC_present2$C_kg_per_acre_surv_adj1 <- (SC_present2$C_kg_per_acre1 * SC_present2$Est_Survival)
+
+SCCC <- dplyr::filter(SC_present2_edit, Year == 2024)
+
+##---- FIGURE 2
+
+present <- ggplot(SC_present2_edit, aes(x = as.factor(Year), y =   (C_kg_per_acre1/2), group = Site, color = Site ))+
+  #geom_point(size = 3, alpha = 0.2)+
+  geom_smooth(method="gam", formula = y ~ s(x, bs = "cs", k=6))+ 
+  xlab("Year") + ylab("C (kg) per acre")+ylim(0,170)
+
+present  <- present  + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=0.1))
+present  <- present  + theme( legend.position = "none") + ggtitle("present ")
+#
+
+present_surv <- ggplot(SC_present2_edit, aes(x = as.factor(Year), y =   (C_kg_per_acre_surv_adj1/2), group = Site, color = Site ))+
+  #geom_point(size = 3, alpha = 0.2)+
+  geom_smooth(method="gam", formula = y ~ s(x, bs = "cs", k=6))+ 
+  xlab("Year") + ylab("C (kg)")+ylim(0,170)
+
+present_surv <- present_surv + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=0.1))
+present_surv <- present_surv + theme( legend.position = "none") + ggtitle("present adjusted by survival")
